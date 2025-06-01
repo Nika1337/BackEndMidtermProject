@@ -69,3 +69,18 @@ string GetMimeType(string ext) => ext switch
     ".js" => "application/javascript",
     _ => "text/plain"
 };
+
+void SendError(StreamWriter writer, int code, string title, string errorFile)
+{
+    string filePath = Path.Combine("wwwroot", errorFile);
+    string body = File.Exists(filePath)
+        ? File.ReadAllText(filePath)
+        : $"<html><body><h1>Error {code}: {title}</h1></body></html>";
+
+    writer.WriteLine($"HTTP/1.1 {code} {title}");
+    writer.WriteLine("Content-Type: text/html");
+    writer.WriteLine($"Content-Length: {Encoding.UTF8.GetByteCount(body)}");
+    writer.WriteLine();
+    writer.Write(body);
+    writer.Flush();
+}
