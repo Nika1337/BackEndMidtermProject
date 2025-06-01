@@ -9,6 +9,12 @@ Console.WriteLine($"Listening for request started on port {portNumber}");
 while (true)
 {
     var client = await listener.AcceptTcpClientAsync();
-    Console.WriteLine("Accepted new client");
+
+    _ = Task.Run(() => HandleClient(client));
+}
+
+void HandleClient(TcpClient client)
+{
+    Console.WriteLine("Handling client...");
     client.Close();
 }
