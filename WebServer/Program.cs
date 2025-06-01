@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 
 var portNumber = 8080;
 var listener = new TcpListener(IPAddress.Any, portNumber);
@@ -15,6 +16,11 @@ while (true)
 
 void HandleClient(TcpClient client)
 {
-    Console.WriteLine("Handling client...");
+    using var stream = client.GetStream();
+    using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+
+    var requestLine = reader.ReadLine();
+    Console.WriteLine($"Request: {requestLine}");
+
     client.Close();
 }
