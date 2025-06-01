@@ -1,9 +1,12 @@
-﻿
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 using System.Net;
 using System.Text;
 
 namespace WebServer;
+
+/// <summary>
+/// Handles HTTP requests from TCP clients.
+/// </summary>
 public class RequestHandler
 {
     private readonly string _rootDirectory;
@@ -11,6 +14,12 @@ public class RequestHandler
     private static readonly string[] _protectedFiles = { "not_allowed.html", "forbidden.html", "not_found.html" };
     private readonly Logger _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RequestHandler"/> class.
+    /// </summary>
+    /// <param name="rootDirectory">Root directory where static files are served from.</param>
+    /// <param name="logFilePath">Path to the log file for request logging.</param>
+    /// <param name="allowedExtensions">Array of allowed file extensions.</param>
     public RequestHandler(string rootDirectory, string logFilePath, string[] allowedExtensions)
     {
         _rootDirectory = Path.GetFullPath(rootDirectory);
@@ -18,6 +27,10 @@ public class RequestHandler
         _logger = new Logger(logFilePath);
     }
 
+    /// <summary>
+    /// Handles a single TCP client connection and serves an HTTP response.
+    /// </summary>
+    /// <param name="client">The connected <see cref="TcpClient"/>.</param>
     public void HandleClient(TcpClient client)
     {
         try
@@ -31,9 +44,7 @@ public class RequestHandler
 
             string? requestLine = reader.ReadLine();
             if (string.IsNullOrWhiteSpace(requestLine))
-            {
                 return;
-            }
 
             LogRequest(client, requestLine);
 
@@ -90,19 +101,32 @@ public class RequestHandler
         }
     }
 
-    private static bool ValidateMethod(string method) => string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Validates if the HTTP method is supported.
+    /// </summary>
+    private static bool ValidateMethod(string method) =>
+        string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase);
 
-    private bool ValidateExtension(string ext) => _allowedExtensions.Contains(ext);
+    /// <summary>
+    /// Checks if a file extension is allowed.
+    /// </summary>
+    private bool ValidateExtension(string ext) =>
+        _allowedExtensions.Contains(ext);
 
+    /// <summary>
+    /// Checks whether the requested file is a protected internal error page.
+    /// </summary>
     private static bool IsProtectedFile(string fileName) =>
         _protectedFiles.Contains(Path.GetFileName(fileName), StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Logs the incoming request to the logger with IP and timestamp.
+    /// </summary>
     private void LogRequest(TcpClient client, string requestLine)
     {
-        string clientIp = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+        string clientIp = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString() ?? "N/A";
         string timeStamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         string logEntry = $"{timeStamp} - {clientIp} - {requestLine}";
         _logger.Log(logEntry);
     }
-
 }
