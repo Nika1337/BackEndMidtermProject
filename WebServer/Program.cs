@@ -18,9 +18,17 @@ void HandleClient(TcpClient client)
 {
     using var stream = client.GetStream();
     using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+    using var writer = new StreamWriter(stream) { AutoFlush = true };
 
     var requestLine = reader.ReadLine();
-    Console.WriteLine($"Request: {requestLine}");
+    if (requestLine == null || !requestLine.StartsWith("GET "))
+    {
+        client.Close();
+        return;
+    }
+
+    var path = requestLine.Split(' ')[1];
+    Console.WriteLine($"Path: {path}");
 
     client.Close();
 }
