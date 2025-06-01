@@ -2,15 +2,18 @@
 using System.Net.Sockets;
 using System.Text;
 
-var portNumber = 8080;
-var listener = new TcpListener(IPAddress.Any, portNumber);
+int port = 8080;
+string rootDirectory = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+string logFilePath = Path.Combine(AppContext.BaseDirectory, "log.txt");
+string[] allowedExtensions = [".html", ".css", ".js"];
+
+var listener = new TcpListener(IPAddress.Any, port);
 listener.Start();
-Console.WriteLine($"Listening for request started on port {portNumber}");
+Console.WriteLine($"Server started on port {port}");
 
 while (true)
 {
     var client = await listener.AcceptTcpClientAsync();
-
     _ = Task.Run(() => HandleClient(client));
 }
 
@@ -18,78 +21,102 @@ void HandleClient(TcpClient client)
 {
     using var stream = client.GetStream();
     using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
-    using var writer = new StreamWriter(stream) { AutoFlush = true };
+    using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true) { AutoFlush = true };
 
-    var requestLine = reader.ReadLine();
-    if (requestLine == null || !requestLine.StartsWith("GET "))
+    try
     {
-        client.Close();
-        return;
-    }
+        string? requestLine = reader.ReadLine();
+        if (requestLine == null)
+            return;
 
-    string[] allowedExtensions = [".html", ".css", ".js"];
+        File.AppendAllText(logFilePath, $"{DateTime.Now}: {requestLine}{Environment.NewLine}");
 
-    string path = requestLine.Split(' ')[1];
-    string ext = Path.GetExtension(path);
+        string[] parts = requestLine.Split(' ');
+        if (parts.Length != 3)
+        {
+            SendError(writer, 400, "Bad Request", "not_allowed.html");
+            return;
+        }
 
-    if (!allowedExtensions.Contains(ext))
-    {
-        client.Close();
-        return;
-    }
+        string method = parts[0];
+        string urlPath = parts[1];
+        string ext = Path.GetExtension(urlPath);
 
-    string requestedPath = path.TrimStart('/');
-    string combined = Path.GetFullPath(Path.Combine("wwwroot", requestedPath));
-    string root = Path.GetFullPath("wwwroot");
+        if (method != "GET")
+        {
+            SendError(writer, 405, "Method Not Allowed", "not_allowed.html");
+            return;
+        }
 
-    if (!combined.StartsWith(root))
-    {
-        SendError(writer, 403, "Forbidden", "forbidden.html");
-        return;
-    }
+        if (!allowedExtensions.Contains(ext))
+        {
+            SendError(writer, 403, "Forbidden", "forbidden.html");
+            return;
+        }
 
+        string relativePath = urlPath.TrimStart('/');
+        string fileName = Path.GetFileName(relativePath);
 
-    if (File.Exists(combined))
-    {
-        var content = File.ReadAllBytes(combined);
-        var mime = GetMimeType(ext);
+        if (fileName is "not_allowed.html" or "forbidden.html" or "not_found.html")
+        {
+            SendError(writer, 403, "Forbidden", "forbidden.html");
+            return;
+        }
 
-        writer.WriteLine("HTTP/1.1 200 OK");
-        writer.WriteLine($"Content-Type: {mime}");
-        writer.WriteLine($"Content-Length: {content.Length}");
-        writer.WriteLine();
+        string fullPath = Path.GetFullPath(Path.Combine(rootDirectory, relativePath));
+
+        if (!fullPath.StartsWith(rootDirectory))
+        {
+            SendError(writer, 403, "Forbidden", "forbidden.html");
+            return;
+        }
+
+        if (!File.Exists(fullPath))
+        {
+            SendError(writer, 404, "Not Found", "not_found.html");
+            return;
+        }
+
+        byte[] content = File.ReadAllBytes(fullPath);
+        string mime = GetMimeType(ext);
+
+        writer.Write($"HTTP/1.1 200 OK\r\n");
+        writer.Write($"Content-Type: {mime}\r\n");
+        writer.Write($"Content-Length: {content.Length}\r\n");
+        writer.Write($"\r\n");
         writer.Flush();
+
         stream.Write(content, 0, content.Length);
     }
-    else
+    catch (Exception ex)
     {
-        return;
+        Console.WriteLine($"Error: {ex.Message}");
     }
-
-
-    client.Close();
+    finally
+    {
+        client.Close();
+    }
 }
 
+void SendError(StreamWriter writer, int code, string title, string errorFile)
+{
+    string errorPath = Path.Combine(rootDirectory, errorFile);
+    string body = File.Exists(errorPath)
+        ? File.ReadAllText(errorPath)
+        : $"<html><body><h1>Error {code}: {title}</h1></body></html>";
+
+    writer.Write($"HTTP/1.1 {code} {title}\r\n");
+    writer.Write("Content-Type: text/html\r\n");
+    writer.Write($"Content-Length: {Encoding.UTF8.GetByteCount(body)}\r\n");
+    writer.Write("\r\n");
+    writer.Write(body);
+    writer.Flush();
+}
 
 string GetMimeType(string ext) => ext switch
 {
     ".html" => "text/html",
     ".css" => "text/css",
     ".js" => "application/javascript",
-    _ => "text/plain"
+    _ => "application/octet-stream"
 };
-
-void SendError(StreamWriter writer, int code, string title, string errorFile)
-{
-    string filePath = Path.Combine("wwwroot", errorFile);
-    string body = File.Exists(filePath)
-        ? File.ReadAllText(filePath)
-        : $"<html><body><h1>Error {code}: {title}</h1></body></html>";
-
-    writer.WriteLine($"HTTP/1.1 {code} {title}");
-    writer.WriteLine("Content-Type: text/html");
-    writer.WriteLine($"Content-Length: {Encoding.UTF8.GetByteCount(body)}");
-    writer.WriteLine();
-    writer.Write(body);
-    writer.Flush();
-}
