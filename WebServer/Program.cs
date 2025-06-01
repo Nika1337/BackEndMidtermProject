@@ -38,5 +38,25 @@ void HandleClient(TcpClient client)
         return;
     }
 
+    string filePath = Path.Combine("wwwroot", path.TrimStart('/'));
+
+    if (File.Exists(filePath))
+    {
+        var content = File.ReadAllBytes(filePath);
+        var mime = "";
+
+        writer.WriteLine("HTTP/1.1 200 OK");
+        writer.WriteLine($"Content-Type: {mime}");
+        writer.WriteLine($"Content-Length: {content.Length}");
+        writer.WriteLine();
+        writer.Flush();
+        stream.Write(content, 0, content.Length);
+    }
+    else
+    {
+        return;
+    }
+
+
     client.Close();
 }
