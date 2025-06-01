@@ -38,11 +38,20 @@ void HandleClient(TcpClient client)
         return;
     }
 
-    string filePath = Path.Combine("wwwroot", path.TrimStart('/'));
+    string requestedPath = path.TrimStart('/');
+    string combined = Path.GetFullPath(Path.Combine("wwwroot", requestedPath));
+    string root = Path.GetFullPath("wwwroot");
 
-    if (File.Exists(filePath))
+    if (!combined.StartsWith(root))
     {
-        var content = File.ReadAllBytes(filePath);
+        SendError(writer, 403, "Forbidden", "forbidden.html");
+        return;
+    }
+
+
+    if (File.Exists(combined))
+    {
+        var content = File.ReadAllBytes(combined);
         var mime = GetMimeType(ext);
 
         writer.WriteLine("HTTP/1.1 200 OK");
