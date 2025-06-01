@@ -27,8 +27,16 @@ void HandleClient(TcpClient client)
         return;
     }
 
-    var path = requestLine.Split(' ')[1];
-    Console.WriteLine($"Path: {path}");
+    string[] allowedExtensions = [".html", ".css", ".js"];
+
+    string path = requestLine.Split(' ')[1];
+    string ext = Path.GetExtension(path);
+
+    if (!allowedExtensions.Contains(ext))
+    {
+        client.Close();
+        return;
+    }
 
     client.Close();
 }
