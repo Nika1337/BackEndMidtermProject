@@ -43,7 +43,7 @@ void HandleClient(TcpClient client)
     if (File.Exists(filePath))
     {
         var content = File.ReadAllBytes(filePath);
-        var mime = "";
+        var mime = GetMimeType(ext);
 
         writer.WriteLine("HTTP/1.1 200 OK");
         writer.WriteLine($"Content-Type: {mime}");
@@ -60,3 +60,12 @@ void HandleClient(TcpClient client)
 
     client.Close();
 }
+
+
+string GetMimeType(string ext) => ext switch
+{
+    ".html" => "text/html",
+    ".css" => "text/css",
+    ".js" => "application/javascript",
+    _ => "text/plain"
+};
